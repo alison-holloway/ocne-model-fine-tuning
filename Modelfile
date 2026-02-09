@@ -1,0 +1,11 @@
+# Oracle CNE Fine-tuned Model
+# Based on Llama 3.1 8B Instruct, fine-tuned on Oracle CNE documentation
+
+FROM ./Model/oracle_cne_merged_16bit
+
+SYSTEM """You are an expert on Oracle Cloud Native Environment (CNE). Provide accurate, detailed, and helpful answers based on the official Oracle CNE documentation. Include specific commands, configuration details, and best practices when relevant."""
+
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER stop <|eot_id|>
+PARAMETER stop <|end_of_text|>

@@ -21,6 +21,9 @@ Dataset/
   ocne_clusters_training_qa.md       # Source Q&A: cluster management
   ocne_concepts_training_qa.md       # Source Q&A: concepts guide
   ocne_quick_start_training_qa.md    # Source Q&A: quick start guide
+inference.py                         # Local inference script (MPS/CPU)
+convert_to_ollama.sh                 # Convert model to Ollama format
+Modelfile                            # Ollama model configuration
 plan.md                              # Detailed training guide and troubleshooting
 ```
 
@@ -59,18 +62,46 @@ After training, the notebook produces:
 - **LoRA adapters** (~100-200MB) - lightweight, requires base Llama 3.1 8B
 - **Merged 16-bit model** (~16GB, optional) - standalone, no base model needed
 - **Merged 4-bit model** (~4-5GB, optional) - smallest standalone option
+- **GGUF for Ollama** (~4.5GB, optional) - pre-quantized, recommended for Ollama deployment
 
 Model files are not included in this repository due to size. See [plan.md](plan.md) for deployment instructions including Ollama and vLLM.
 
-## Local Setup (Optional)
+## Deployment
 
-For local inference with a trained model:
+### Local Inference (Python)
+
+Run the model locally on Apple Silicon (MPS) or CPU:
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+
+# Interactive mode
+python inference.py
+
+# Single question
+python inference.py --question "How do I create a cluster with ocne?"
+
+# Force CPU if MPS runs out of memory
+python inference.py --cpu
 ```
+
+### Ollama
+
+Import the model into Ollama for easy local serving:
+
+```bash
+brew install ollama
+ollama serve  # in another terminal, or use the Ollama app
+
+./convert_to_ollama.sh
+ollama run oracle-cne
+```
+
+The script auto-detects the model format in `Model/`:
+- **GGUF file** (recommended) - lightweight import, works on Macs with 16GB RAM. Export from the Colab notebook by setting `save_gguf=True`, then place the `.gguf` file in `Model/`.
+- **Safetensors fallback** - converts on-device, requires 32GB+ RAM. The script will warn before proceeding.
 
 ## Documentation
 
