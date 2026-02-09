@@ -1,0 +1,9 @@
+# Requirements for local model inference and data processing
+# For training on Google Colab, see the notebook (Dataset/oracle_cne_unsloth_training.ipynb)
+
+torch>=2.0
+transformers>=4.40
+accelerate>=1.0
+safetensors>=0.4
+huggingface-hub>=0.20
+numpy>=2.0

@@ -1,3 +1,32 @@
+# === Project-specific ignores ===
+
+# macOS system files
+.DS_Store
+._*
+
+# Model outputs - too large for git (27GB+)
+Model/
+
+# Large model file patterns (safety net)
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+*.zip
+
+# Training outputs
+outputs/
+checkpoints/
+wandb/
+runs/
+
+# Claude AI assistant files
+.claude/
+
+# === Python gitignore template ===
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
