@@ -9,6 +9,7 @@ Fine-tune Llama 3.1 8B on Oracle Cloud Native Environment (CNE) documentation us
 - [Quick Start](#quick-start)
 - [Training Details](#training-details)
 - [Dataset](#dataset)
+- [Dataset Generation](#dataset-generation)
 - [Model Outputs](#model-outputs)
 - [Deployment](#deployment)
 - [Documentation](#documentation)
@@ -32,6 +33,8 @@ Dataset/
   ocne_clusters_training_qa.md       # Source Q&A: cluster management
   ocne_concepts_training_qa.md       # Source Q&A: concepts guide
   ocne_quick_start_training_qa.md    # Source Q&A: quick start guide
+  scrape_docs.py                     # Scrape Oracle CNE Release 2 docs → chunks JSON
+  generate_qa.py                     # Generate Q&A pairs from chunks via local Ollama
   oracle_cne_unsloth_training.ipynb  # Legacy: original Colab notebook (deprecated)
 train.py                             # Training script (local GPU)
 inference.py                         # Inference script (CUDA / MPS / CPU)
@@ -40,6 +43,7 @@ cleanup.sh                           # Remove large intermediate files after Oll
 Modelfile                            # Ollama model configuration
 requirements.txt                     # Inference dependencies
 requirements-training.txt            # Training dependencies
+requirements-datagen.txt             # Dataset generation dependencies
 .env.example                         # Token configuration template
 plan.md                              # Detailed training guide and troubleshooting
 ```
@@ -103,6 +107,29 @@ The training data covers four areas of Oracle CNE documentation:
 - **Cluster Management** - Provider types (libvirt, OCI, OLVM, BYO), scaling, updates
 - **Concepts** - Architecture, components, OCK images, networking
 - **Quick Start** - Installation, first cluster creation, application deployment
+
+## Dataset Generation
+
+To generate a larger dataset from the full Oracle CNE Release 2 documentation using a local Ollama model:
+
+```bash
+pip install -r requirements-datagen.txt
+
+# Step 1: Scrape the docs (~5-10 min)
+python Dataset/scrape_docs.py --verbose
+
+# Step 2: Sanity check the prompt
+python Dataset/generate_qa.py --dry-run
+
+# Step 3: Generate Q&A pairs (~20-60 min depending on GPU)
+python Dataset/generate_qa.py --pairs 3
+
+# Step 4: Review the output, then merge when satisfied
+cat Dataset/ocne_generated_*.jsonl >> Dataset/ocne_training_data.jsonl
+```
+
+Requires a running Ollama instance with `llama32:latest` (or pass `--model` to use another).
+See [plan.md](plan.md) for full details and CLI options.
 
 ## Model Outputs
 

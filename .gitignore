@@ -7,6 +7,11 @@
 # Model outputs - too large for git (27GB+)
 Model/
 
+# Dataset generation intermediates (scrape_docs.py output and generated JSONL)
+# Review generated JSONL before merging into ocne_training_data.jsonl
+Dataset/ocne_chunks.json
+Dataset/ocne_generated_*.jsonl
+
 # Large model file patterns (safety net)
 *.safetensors
 *.gguf
