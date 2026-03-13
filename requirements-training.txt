@@ -1,0 +1,21 @@
+# Training dependencies for local GPU (NVIDIA)
+# Install PyTorch with CUDA first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+#
+# Install Flash Attention 2 separately (compiles from source, ~10 min):
+#   pip install flash-attn --no-build-isolation
+#
+# Then install the rest:
+#   pip install -r requirements-training.txt
+
+torch>=2.6
+transformers>=4.47
+peft>=0.14
+trl>=0.13
+bitsandbytes>=0.45
+datasets>=3.0
+accelerate>=1.0
+huggingface-hub>=0.20
+safetensors>=0.4
+numpy>=2.0
+python-dotenv>=1.0

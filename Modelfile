@@ -1,7 +1,7 @@
 # Oracle CNE Fine-tuned Model
 # Based on Llama 3.1 8B Instruct, fine-tuned on Oracle CNE documentation
 
-FROM ./Model/oracle_cne_merged_16bit
+FROM ./Model/oracle_cne_q4_k_m.gguf
 
 SYSTEM """You are an expert on Oracle Cloud Native Environment (CNE). Provide accurate, detailed, and helpful answers based on the official Oracle CNE documentation. Include specific commands, configuration details, and best practices when relevant."""
 

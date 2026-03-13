@@ -1,304 +1,336 @@
-# Oracle CNE Fine-tuning Guide with Unsloth
-
-Complete guide for fine-tuning Llama 3.1 8B on Oracle Cloud Native Environment documentation using Unsloth on Google Colab free tier.
-
-## 📋 Prerequisites
-
-- Google account (for Colab)
-- `ocne_training_data.jsonl` file (285 Q&A pairs)
-- Basic understanding of machine learning concepts
-
-## 🚀 Quick Start
-
-### 1. Open Google Colab
-1. Go to [Google Colab](https://colab.research.google.com/)
-2. Upload the `oracle_cne_unsloth_training.ipynb` notebook
-3. Or use: `File → Upload notebook`
-
-### 2. Enable GPU
-1. Go to `Runtime → Change runtime type`
-2. Select `T4 GPU` under Hardware accelerator
-3. Click Save
-
-### 3. Upload Training Data
-When prompted in the notebook (Step 4), upload your `ocne_training_data.jsonl` file.
-
-### 4. Run All Cells
-- Use `Runtime → Run all` or run cells sequentially
-- Training takes approximately 15-30 minutes on T4 GPU
-
-## 📊 What to Expect
-
-### Training Configuration
-- **Model**: Llama 3.1 8B Instruct
-- **Training samples**: 285 (256 train, 29 validation)
-- **Epochs**: 3
-- **Effective batch size**: 8
-- **Memory usage**: ~14-15GB VRAM (fits T4)
-- **Training time**: 15-30 minutes
-
-### Expected Results
-- Final training loss: ~0.3-0.5 (lower is better)
-- The model should accurately answer Oracle CNE technical questions
-- Responses should be detailed and match documentation style
-
-## 🔧 Troubleshooting
-
-### Out of Memory Error
-**Symptoms**: CUDA out of memory error during training
-
-**Solutions**:
-1. Reduce batch size in Step 7:
-   ```python
-   per_device_train_batch_size=1,
-   gradient_accumulation_steps=8,
-   ```
-2. Reduce max sequence length:
-   ```python
-   max_seq_length=1024
-   ```
-
-### Slow Training
-**Symptoms**: Training is very slow or stuck
-
-**Solutions**:
-1. Ensure GPU is enabled (should say T4 in Colab)
-2. Restart runtime: `Runtime → Restart runtime`
-3. Check GPU usage: `!nvidia-smi`
-
-### Poor Model Performance
-**Symptoms**: Model gives generic or incorrect answers
-
-**Solutions**:
-1. Increase epochs to 5-7:
-   ```python
-   num_train_epochs=5
-   ```
-2. Lower learning rate:
-   ```python
-   learning_rate=1e-4
-   ```
-3. Add more training data if available
-
-### Disconnection Issues
-**Symptom**: Colab disconnects during training
-
-**Solutions**:
-1. Keep the Colab tab active
-2. Use Colab Pro for longer runtimes
-3. Save checkpoints (already configured every 50 steps)
-
-## 📁 Output Files
-
-After training, you'll have:
-
-### LoRA Adapters (Recommended)
-- **Location**: `oracle_cne_lora_model/`
-- **Size**: ~100-200MB
-- **Contains**: 
-  - `adapter_config.json`
-  - `adapter_model.safetensors`
-  - `tokenizer_config.json`
-  - Other tokenizer files
-
-**Usage**: Load with base Llama 3.1 8B + these adapters
-
-### Merged Models (Optional)
-If you chose to save merged models:
-- **16-bit merged**: `oracle_cne_merged_16bit/` (~16GB)
-- **4-bit merged**: `oracle_cne_merged_4bit/` (~4-5GB)
-
-**Usage**: Standalone models, no base model needed
-
-## 🎯 Using Your Fine-tuned Model
-
-### Option 1: In Colab (Immediate Testing)
-Use the interactive testing cells (Steps 11-12) in the notebook.
-
-### Option 2: Load in Python
-```python
-from unsloth import FastLanguageModel
-
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="oracle_cne_lora_model",
-    max_seq_length=2048,
-    load_in_4bit=True,
-)
-
-FastLanguageModel.for_inference(model)
-
-# Use the model
-inputs = tokenizer(["Your question here"], return_tensors="pt").to("cuda")
-outputs = model.generate(**inputs, max_new_tokens=512)
-print(tokenizer.decode(outputs[0]))
-```
-
-### Option 3: Deploy with Ollama
-1. Convert to GGUF format:
-   ```bash
-   python convert_hf_to_gguf.py oracle_cne_merged_16bit \
-     --outtype q4_k_m \
-     --outfile oracle-cne-q4.gguf
-   ```
-2. Create Modelfile:
-   ```
-   FROM ./oracle-cne-q4.gguf
-   TEMPLATE """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-   You are an Oracle CNE expert...<|eot_id|>..."""
-   ```
-3. Import: `ollama create oracle-cne -f Modelfile`
-4. Run: `ollama run oracle-cne`
-
-### Option 4: Deploy with vLLM
-```python
-from vllm import LLM, SamplingParams
-
-llm = LLM(model="oracle_cne_merged_16bit")
-sampling_params = SamplingParams(temperature=0.7, max_tokens=512)
-
-outputs = llm.generate(["Your question"], sampling_params)
-print(outputs[0].outputs[0].text)
-```
-
-## 🎛️ Advanced Customization
-
-### Adjust Training Duration
-In Step 7, modify:
-```python
-num_train_epochs=5,  # More epochs for better learning
-```
-
-### Change Learning Rate
-```python
-learning_rate=1e-4,  # Lower = more stable, higher = faster
-```
-
-### Modify LoRA Rank
-In Step 3, change `r` value:
-```python
-r=32,  # Higher = more parameters, better quality, slower
-```
-
-### Adjust Temperature (Inference)
-In Step 11:
-```python
-temperature=0.7,  # Lower = more focused, higher = more creative
-```
-
-## 📈 Monitoring Training
-
-### Key Metrics to Watch
-
-1. **Training Loss**: Should decrease over time
-   - Good: 0.3-0.5
-   - Concerning: Not decreasing or increasing
-
-2. **Validation Loss**: Should follow training loss
-   - If much higher than training loss = overfitting
-
-3. **GPU Memory**: Should stay under 16GB
-   - Check with: `!nvidia-smi`
-
-### Training Logs
-Look for patterns like:
-```
-{'loss': 0.8123, 'learning_rate': 0.0002, 'epoch': 0.5}
-{'loss': 0.5234, 'learning_rate': 0.00015, 'epoch': 1.0}
-{'loss': 0.3456, 'learning_rate': 0.0001, 'epoch': 1.5}
-```
-
-## 💡 Tips for Best Results
-
-### 1. Data Quality
-- Ensure Q&A pairs are accurate and well-formatted
-- Remove duplicates or very similar questions
-- Balance question types (conceptual, procedural, troubleshooting)
-
-### 2. Training Settings
-- Start with default settings
-- If loss plateaus, try:
-  - Lower learning rate
-  - More epochs
-  - Higher LoRA rank
-
-### 3. Evaluation
-- Test on diverse questions not in training data
-- Compare answers to official documentation
-- Check for hallucinations or incorrect information
-
-### 4. Iteration
-- Fine-tuning is iterative
-- Save different versions with different hyperparameters
-- Keep notes on what works
-
-## 🔒 Best Practices
-
-### Security
-- Don't include sensitive information in training data
-- Be cautious when uploading to public repositories
-- Use private HuggingFace repos if sharing
-
-### Resource Management
-- Close Colab sessions when done to free resources
-- Download models before session ends (12 hours on free tier)
-- Use Google Drive for persistent storage
-
-### Version Control
-- Keep track of training data versions
-- Note hyperparameters for each training run
-- Save training logs and metrics
-
-## 📚 Additional Resources
-
-### Unsloth Documentation
-- [GitHub](https://github.com/unslothai/unsloth)
-- [Documentation](https://docs.unsloth.ai/)
-
-### Llama 3.1 Resources
-- [Model Card](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)
-- [Prompt Format](https://llama.meta.com/docs/model-cards-and-prompt-formats/meta-llama-3/)
-
-### Oracle CNE Documentation
-- [Official Docs](https://docs.oracle.com/en/operating-systems/olcne/)
-- [CLI Reference](https://docs.oracle.com/en/operating-systems/olcne/cli/)
-
-## ❓ FAQ
-
-**Q: Can I use a different model?**  
-A: Yes! Change the model name in Step 2:
-```python
-model_name="unsloth/Meta-Llama-3.1-70B-Instruct"  # Needs more GPU
-model_name="unsloth/mistral-7b-v0.3"  # Alternative
-```
-
-**Q: How do I add more training data?**  
-A: Simply append new Q&A pairs to your JSONL file in the same format.
-
-**Q: Can I continue training from a checkpoint?**  
-A: Yes! Load the saved model and run training again with more epochs.
-
-**Q: Why use LoRA instead of full fine-tuning?**  
-A: LoRA is much more memory-efficient, allowing training on free GPUs while maintaining quality.
-
-**Q: How do I evaluate model quality?**  
-A: Test on held-out questions, compare to documentation, and check for factual accuracy.
-
-## 🤝 Contributing
-
-Have improvements or found issues?
-- Share your training configurations
-- Report bugs or inconsistencies
-- Suggest additional features
-
-## 📄 License
-
-This training notebook is provided as-is for educational purposes. Ensure compliance with:
-- Llama 3.1 license for model usage
-- Oracle documentation usage policies
-- Your organization's data policies
+# OCNE Model Training — Local GPU Guide
+
+Fine-tunes Llama 3.1 8B on Oracle CNE documentation using QLoRA on a local NVIDIA GPU.
+No cloud service or Unsloth required.
+
+## Table of Contents
+
+- [Hardware Requirements](#hardware-requirements)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Training](#training)
+  - [Smoke test first](#smoke-test-first-verifies-setup-2-min)
+  - [Full training run](#full-training-run)
+  - [All CLI options](#all-cli-options)
+- [Output Files](#output-files)
+- [Monitoring Training](#monitoring-training)
+- [Inference](#inference)
+  - [Using the merged 16-bit model](#using-the-merged-16-bit-model)
+  - [Using LoRA adapters directly](#using-lora-adapters-directly-memory-efficient)
+- [Deploying with Ollama](#deploying-with-ollama)
+  - [Export GGUF first](#export-gguf-first-recommended--smaller-faster)
+  - [Cleanup](#cleanup)
+- [Troubleshooting](#troubleshooting)
+- [Tuning Tips](#tuning-tips)
+- [Resources](#resources)
+- [Legacy](#legacy)
+
+## Hardware Requirements
+
+| Component | Minimum | This Setup |
+|-----------|---------|------------|
+| GPU VRAM  | 16 GB   | 16 GB      |
+| RAM       | 32 GB   | 32 GB      |
+| Disk      | 30 GB free | — |
+| CUDA      | 12.1+   | —          |
+
+Expected VRAM usage during training: ~13–15 GB (leaves comfortable headroom).
 
 ---
 
-**Happy Training! 🚀**
+## Prerequisites
 
-For questions or issues, refer to the Unsloth documentation or Oracle CNE community forums.
+1. **NVIDIA drivers and CUDA toolkit** — verify with `nvidia-smi` and `nvcc --version`
+2. **Python 3.11+** — `python3 --version`
+3. **Hugging Face token** — Llama 3.1 is a gated model:
+   - Go to https://huggingface.co/settings/tokens → New token → Role: Read
+   - Accept the license at https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct
+   - Copy the token (starts with `hf_...`)
+   - Create your `.env` file:
+     ```bash
+     cp .env.example .env
+     # Edit .env and replace hf_your_token_here with your actual token
+     ```
+
+---
+
+## Setup
+
+```bash
+# 1. Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 2. Install PyTorch with CUDA support
+pip install torch --index-url https://download.pytorch.org/whl/cu126
+
+# 3. Install remaining training dependencies
+pip install -r requirements-training.txt
+
+# Optional: Install Flash Attention 2 (requires system CUDA toolkit to match PyTorch's CUDA version)
+# Check first: python -c "import torch; print(torch.version.cuda)" and nvcc --version
+# If they match: pip install flash-attn --no-build-isolation
+# If not, sdpa (the default) works well without it.
+```
+
+---
+
+## Training
+
+### Smoke test first (verifies setup, ~2 min)
+
+```bash
+python train.py --epochs 1 --max-steps 20
+```
+
+Expected output: loss around 1.0–2.0, no OOM errors.
+
+### Full training run
+
+```bash
+python train.py --epochs 10 --batch-size 2 --grad-accum 4
+```
+
+| Setting | Value |
+|---------|-------|
+| Base model | Llama 3.1 8B Instruct |
+| Quantization | 4-bit NF4 QLoRA |
+| LoRA rank / alpha | 16 / 16 |
+| Batch size | 2 (effective: 8 with grad accum 4) |
+| Epochs | 10 |
+| Learning rate | 2e-4 |
+| Max sequence length | 2048 tokens |
+| Attention | sdpa (PyTorch built-in) |
+| Precision | bfloat16 |
+| Peak RAM usage | ~9 GB |
+| Expected time | ~8 minutes |
+| Expected final loss | 0.35–0.45 |
+
+### All CLI options
+
+```
+python train.py --help
+
+  --base-model    HuggingFace model ID or local path
+  --dataset       Path to JSONL file (default: Dataset/ocne_training_data.jsonl)
+  --output-dir    Where to save LoRA adapters (default: Model/oracle_cne_lora)
+  --epochs        Training epochs (default: 10)
+  --batch-size    Per-device batch size (default: 2)
+  --grad-accum    Gradient accumulation steps (default: 4, effective batch=8)
+  --lr            Learning rate (default: 2e-4)
+  --lora-rank     LoRA rank r (default: 16)
+  --lora-alpha    LoRA alpha (default: 16)
+  --max-seq-len   Max token length (default: 2048)
+  --max-steps     Override epochs with a fixed step count
+  --merge         Merge LoRA into base model after training (saves ~14 GB 16-bit model)
+  --flash-attn    Use flash_attention_2 instead of sdpa (requires flash-attn package)
+```
+
+---
+
+## Output Files
+
+After training, the LoRA adapters are saved to `Model/oracle_cne_lora/`:
+
+```
+Model/oracle_cne_lora/
+  adapter_config.json
+  adapter_model.safetensors   (~100–200 MB)
+  tokenizer.json
+  tokenizer_config.json
+  special_tokens_map.json
+```
+
+To also produce a standalone merged model:
+
+```bash
+python train.py --merge
+```
+
+This saves the weights as 16-bit safetensors to `Model/oracle_cne_merged_16bit/` (~14 GB on disk).
+When loaded for inference on CUDA, bitsandbytes re-quantizes them to 4-bit in memory (~5 GB VRAM).
+The 16-bit files are kept on disk so they can be used for GGUF export via llama.cpp.
+
+---
+
+## Monitoring Training
+
+Training logs to stdout. Key lines to watch:
+
+```
+{'loss': 1.85, 'epoch': 0.1}   ← early loss (expected: 1.5–2.5)
+{'loss': 0.85, 'epoch': 1.0}   ← after epoch 1 (expected: 0.7–1.2)
+{'loss': 0.42, 'epoch': 3.0}   ← final (target: 0.3–0.5)
+```
+
+Eval loss is logged every 25 steps. If eval loss is significantly higher than train
+loss (>0.3 gap), the model may be overfitting — reduce epochs or increase dropout.
+
+To enable TensorBoard logging, install tensorboard and add `--report-to tensorboard`:
+```bash
+pip install tensorboard
+# (re-run training with report_to="tensorboard" set in train.py)
+tensorboard --logdir Model/checkpoints/runs
+```
+
+---
+
+## Inference
+
+### Using the merged 16-bit model
+
+```bash
+# Interactive mode
+python inference.py
+
+# Single question
+python inference.py --question "How do I install OCNE on Oracle Linux?"
+```
+
+The script auto-detects CUDA → MPS → CPU in that order. On CUDA the model is loaded
+in 4-bit quantization (~5 GB VRAM), which fits comfortably on a 16 GB GPU and produces
+responses indistinguishable from 16-bit for Q&A tasks.
+
+### Using LoRA adapters directly (memory-efficient)
+
+Load adapters on top of the base model in your own script:
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+base = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+model = PeftModel.from_pretrained(base, "Model/oracle_cne_lora")
+tokenizer = AutoTokenizer.from_pretrained("Model/oracle_cne_lora")
+```
+
+---
+
+## Deploying with Ollama
+
+### Export GGUF first (recommended — smaller, faster)
+
+Use a **separate venv** for llama.cpp — its dependencies (numpy, sentencepiece, gguf)
+are unrelated to the training stack and should not be mixed with the project venv.
+
+```bash
+# Clone llama.cpp once alongside the project (i.e. ~/gitrepos/llama.cpp)
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+
+# Build llama-quantize (needed for the second step)
+cmake -B build && cmake --build build --config Release -j$(nproc)
+
+# Create and activate a dedicated venv for llama.cpp
+python3 -m venv venv-llamacpp
+source venv-llamacpp/bin/activate
+pip install -r requirements.txt
+
+# Step 1: Convert merged model to f16 GGUF
+# (convert_hf_to_gguf.py no longer supports --outtype q4_k_m directly)
+python3 convert_hf_to_gguf.py ../ocne-model-training/Model/oracle_cne_merged_16bit \
+  --outfile ../ocne-model-training/Model/oracle_cne_f16.gguf \
+  --outtype f16
+
+# Step 2: Quantize to Q4_K_M
+./build/bin/llama-quantize \
+  ../ocne-model-training/Model/oracle_cne_f16.gguf \
+  ../ocne-model-training/Model/oracle_cne_q4_k_m.gguf \
+  Q4_K_M
+
+# Clean up the intermediate f16 file (optional — it's ~15 GB)
+rm ../ocne-model-training/Model/oracle_cne_f16.gguf
+
+deactivate
+```
+
+Then import into Ollama (no Python needed — just ollama):
+
+```bash
+cd ..   # back to the project root
+bash convert_to_ollama.sh
+```
+
+### Cleanup
+
+After the model is imported into Ollama, free ~22 GB of intermediate files while keeping everything needed to retrain:
+
+```bash
+bash cleanup.sh
+```
+
+This removes the merged 16-bit model, the GGUF files, training checkpoints, and the llama.cpp build and venv. It keeps `venv/`, `Model/oracle_cne_lora/`, `Dataset/`, and `~/.cache/huggingface`.
+
+---
+
+## Troubleshooting
+
+### Out of Memory (CUDA OOM) during training
+
+The default settings (batch 2, grad accum 4) are tuned for 16 GB VRAM with ~9 GB peak
+RAM. If you still hit OOM, reduce sequence length:
+```bash
+python train.py --max-seq-len 1024
+```
+
+### Flash Attention 2 compile error
+
+Training defaults to `sdpa` (PyTorch built-in) which also uses Flash Attention kernels
+automatically. Only use `--flash-attn` if you have the `flash-attn` package installed.
+
+`flash-attn` requires the system CUDA toolkit version to match what PyTorch was built
+against. Check with:
+```bash
+python -c "import torch; print(torch.version.cuda)"  # PyTorch CUDA version
+nvcc --version                                         # system toolkit version
+```
+If they differ, `sdpa` is the correct default.
+
+### `Error: Model not found` during training
+
+The base model downloads automatically from Hugging Face on first run (~16 GB).
+Make sure you have accepted the Llama 3.1 license and run `huggingface-cli login`.
+
+### Training loss not decreasing
+
+- Try increasing LoRA rank: `--lora-rank 32`
+- Try more epochs: `--epochs 5`
+- Check `Dataset/ocne_training_data.jsonl` for duplicate or malformed entries
+
+### Slow training despite GPU
+
+Confirm GPU is being used:
+```bash
+python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+---
+
+## Tuning Tips
+
+| Goal | Change |
+|------|--------|
+| Better quality | Increase `--lora-rank` to 32 or 64 |
+| Faster training | Reduce `--max-seq-len` to 1024 |
+| Prevent overfitting | Reduce `--epochs` to 2 |
+| More stable training | Reduce `--lr` to 1e-4 |
+| More creative responses | Increase temperature in `inference.py` |
+
+---
+
+## Resources
+
+- [Llama 3.1 on Hugging Face](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)
+- [PEFT documentation](https://huggingface.co/docs/peft)
+- [TRL SFTTrainer documentation](https://huggingface.co/docs/trl/sft_trainer)
+- [BitsAndBytes (QLoRA)](https://github.com/TimDettmers/bitsandbytes)
+- [Flash Attention 2](https://github.com/Dao-AILab/flash-attention)
+- [Oracle CNE documentation](https://docs.oracle.com/en/operating-systems/olcne/)
+
+---
+
+## Legacy
+
+The original Google Colab notebook using Unsloth is kept for reference at
+`Dataset/oracle_cne_unsloth_training.ipynb` but is no longer the recommended
+training path.

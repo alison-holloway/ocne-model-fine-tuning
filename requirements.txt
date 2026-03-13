@@ -1,9 +1,16 @@
-# Requirements for local model inference and data processing
-# For training on Google Colab, see the notebook (Dataset/oracle_cne_unsloth_training.ipynb)
+# Requirements for local model inference
+# For local GPU training, see requirements-training.txt
+#
+# Install PyTorch with CUDA support:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+# Then install the rest:
+#   pip install -r requirements.txt
 
-torch>=2.0
+torch>=2.6
 transformers>=4.40
 accelerate>=1.0
+bitsandbytes>=0.45
 safetensors>=0.4
 huggingface-hub>=0.20
 numpy>=2.0
+python-dotenv>=1.0
