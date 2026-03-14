@@ -51,9 +51,30 @@ def fetch_page(url, session, delay):
 
 
 def extract_main_content(html):
-    """Parse HTML and return the <main> tag soup, or None if not found."""
+    """
+    Parse HTML and return the content container, or None if not found.
+    Tries multiple selectors to handle Oracle Help Center's structure,
+    which does not use a standard <main> tag.
+    """
     soup = BeautifulSoup(html, "html.parser")
-    return soup.find("main")
+
+    candidates = [
+        lambda s: s.find("main"),
+        lambda s: s.find(attrs={"role": "main"}),
+        lambda s: s.find(id="content"),
+        lambda s: s.find(id="maincontent"),
+        lambda s: s.find("div", class_="chapter"),
+        lambda s: s.find("div", class_="sect1"),
+        lambda s: s.find("article"),
+        lambda s: s.find("div", class_="book"),
+    ]
+
+    for selector in candidates:
+        result = selector(soup)
+        if result:
+            return result
+
+    return None
 
 
 def find_next_link(soup, current_url):

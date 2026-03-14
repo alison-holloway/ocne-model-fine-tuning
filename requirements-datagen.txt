@@ -1,9 +1,0 @@
-# Requirements for dataset generation scripts (scrape_docs.py + generate_qa.py)
-# These are separate from training and inference dependencies.
-#
-# Usage:
-#   source venv/bin/activate
-#   pip install -r requirements-datagen.txt
-
-requests>=2.28
-beautifulsoup4>=4.12

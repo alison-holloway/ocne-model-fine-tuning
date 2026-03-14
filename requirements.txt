@@ -1,16 +1,29 @@
-# Requirements for local model inference
-# For local GPU training, see requirements-training.txt
+# Dependencies for training, inference, and dataset generation
 #
-# Install PyTorch with CUDA support:
+# Install PyTorch with CUDA first:
 #   pip install torch --index-url https://download.pytorch.org/whl/cu126
+#
 # Then install the rest:
 #   pip install -r requirements.txt
+#
+# Optional — Flash Attention 2 (requires system CUDA toolkit to match PyTorch's CUDA version):
+#   pip install flash-attn --no-build-isolation
 
+# ML stack
 torch>=2.6
-transformers>=4.40
-accelerate>=1.0
+transformers>=4.47,<5.0
+peft>=0.14
+trl>=0.13
 bitsandbytes>=0.45
-safetensors>=0.4
+datasets>=3.0
+accelerate>=1.0
 huggingface-hub>=0.20
+safetensors>=0.4
+
+# Dataset generation
+requests>=2.28
+beautifulsoup4>=4.12
+
+# Utilities
 numpy>=2.0
 python-dotenv>=1.0

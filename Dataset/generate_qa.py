@@ -8,7 +8,7 @@ a timestamped JSONL file matching the format of ocne_training_data.jsonl.
 Usage:
     python Dataset/generate_qa.py --dry-run
     python Dataset/generate_qa.py --pairs 3
-    python Dataset/generate_qa.py --model llama32:latest --pairs 5
+    python Dataset/generate_qa.py --model llama3.2:latest --pairs 5
 """
 
 import argparse
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import requests
 
-DEFAULT_MODEL = "llama32:latest"
+DEFAULT_MODEL = "llama3.2:latest"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
 PROMPT_TEMPLATE = """\
