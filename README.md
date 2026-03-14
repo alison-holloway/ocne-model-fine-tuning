@@ -41,21 +41,23 @@ This project creates a specialized AI assistant for Oracle Cloud Native Environm
 
 ```
 Dataset/
-  ocne_training_data.jsonl           # 285 Q&A pairs in JSONL format
-  ocne_cli_training_qa.md            # Source Q&A: CLI reference
-  ocne_clusters_training_qa.md       # Source Q&A: cluster management
-  ocne_concepts_training_qa.md       # Source Q&A: concepts guide
-  ocne_quick_start_training_qa.md    # Source Q&A: quick start guide
-  scrape_docs.py                     # Scrape Oracle CNE Release 2 docs → chunks JSON
-  generate_qa.py                     # Generate Q&A pairs from chunks via local Ollama
-  oracle_cne_unsloth_training.ipynb  # Legacy: original Colab notebook (deprecated)
-train.py                             # Training script (local GPU)
-inference.py                         # Inference script (CUDA / MPS / CPU)
-convert_to_ollama.sh                 # Convert model to Ollama format
-cleanup.sh                           # Remove large intermediate files after Ollama import
-Modelfile                            # Ollama model configuration
-requirements.txt                     # All dependencies (training, inference, dataset generation)
-.env.example                         # Token configuration template
+  ocne_training_data.jsonl              # 285 Q&A pairs in JSONL format
+  ocne_cli_training_qa.md               # Source Q&A: CLI reference
+  ocne_clusters_training_qa.md          # Source Q&A: cluster management
+  ocne_concepts_training_qa.md          # Source Q&A: concepts guide
+  ocne_quick_start_training_qa.md       # Source Q&A: quick start guide
+  scrape_docs.py                        # Scrape Oracle CNE Release 2 docs → chunks JSON
+  generate_qa.py                        # Generate Q&A pairs from chunks via local Ollama
+  ocne_chunks.json                      # Generated: scraped doc chunks (gitignored)
+  ocne_generated_YYYYMMDD_HHMMSS.jsonl  # Generated: Q&A output before merging (gitignored)
+  oracle_cne_unsloth_training.ipynb     # Legacy: original Colab notebook (deprecated)
+train.py                                # Training script (local GPU)
+inference.py                            # Inference script (CUDA / MPS / CPU)
+convert_to_ollama.sh                    # Convert model to Ollama format
+cleanup.sh                              # Remove large intermediate files after Ollama import
+Modelfile                               # Ollama model configuration
+requirements.txt                        # All dependencies (training, inference, dataset generation)
+.env.example                            # Token configuration template
 ```
 
 ## Setup
