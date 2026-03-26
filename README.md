@@ -23,8 +23,8 @@ Fine-tune Llama 3.1 8B on Oracle Cloud Native Environment (CNE) documentation us
 
 This project creates a specialized AI assistant for Oracle Cloud Native Environment:
 
-- **285 curated Q&A pairs** covering CLI usage, cluster management, concepts, and quick start guides
-- **4-bit QLoRA** training — ~9 GB peak VRAM, ~8 minutes to train on a 16 GB GPU
+- **1044 curated Q&A pairs** covering CLI usage, cluster management, concepts, and quick start guides
+- **4-bit QLoRA** training — ~9 GB peak VRAM, ~30 minutes to train on a 16 GB GPU
 - **Local training script** (`train.py`) — no cloud services or proprietary libraries required
 - **Multiple deployment options**: Python inference, Ollama, vLLM
 
@@ -41,7 +41,7 @@ This project creates a specialized AI assistant for Oracle Cloud Native Environm
 
 ```
 Dataset/
-  ocne_training_data.jsonl              # 285 Q&A pairs in JSONL format
+  ocne_training_data.jsonl              # 1044 Q&A pairs in JSONL format
   ocne_cli_training_qa.md               # Source Q&A: CLI reference
   ocne_clusters_training_qa.md          # Source Q&A: cluster management
   ocne_concepts_training_qa.md          # Source Q&A: concepts guide
@@ -58,6 +58,7 @@ cleanup.sh                              # Remove large intermediate files after 
 Modelfile                               # Ollama model configuration
 requirements.txt                        # All dependencies (training, inference, dataset generation)
 .env.example                            # Token configuration template
+TODO.md                                 # Outstanding tasks and test plans
 ```
 
 ## Setup
@@ -100,14 +101,14 @@ cp .env.example .env
 
 ## Dataset
 
-The included training data (`Dataset/ocne_training_data.jsonl`) contains 285 hand-curated Q&A pairs covering four areas of Oracle CNE documentation:
+The included training data (`Dataset/ocne_training_data.jsonl`) contains 1044 Q&A pairs covering four areas of Oracle CNE documentation:
 
 - **CLI Reference** (`ocne_cli_training_qa.md`) — Command syntax, completion, environment variables, configuration
 - **Cluster Management** (`ocne_clusters_training_qa.md`) — Provider types (libvirt, OCI, OLVM, BYO), scaling, updates
 - **Concepts** (`ocne_concepts_training_qa.md`) — Architecture, components, OCK images, networking
 - **Quick Start** (`ocne_quick_start_training_qa.md`) — Installation, first cluster creation, application deployment
 
-These 285 pairs cover a useful subset of the docs, but more data generally means better fine-tuning. See [Dataset Generation](#dataset-generation) below to scrape all 9 sections of the Oracle CNE Release 2 docs and generate a much larger dataset automatically.
+See [Dataset Generation](#dataset-generation) below to scrape all 9 sections of the Oracle CNE Release 2 docs and generate additional Q&A pairs automatically.
 
 ## Dataset Generation
 
@@ -115,11 +116,15 @@ Two scripts automate scraping the full Oracle CNE Release 2 documentation and ge
 
 ### Prerequisites
 
-- Ollama running locally (`ollama serve`) with a capable model pulled:
-  ```bash
-  ollama pull llama3.2
-  ```
-- Dataset generation packages are included in `requirements.txt` — no separate install needed.
+Ollama running locally (`ollama serve`) with a model pulled:
+
+```bash
+ollama pull llama3.2
+```
+
+A larger model may produce higher-quality pairs and can be specified when running `generate_qa.py`, e.g. `--model llama3.1:8b`.
+
+Dataset generation packages are included in `requirements.txt` — no separate install needed.
 
 ### Step 1 — Scrape the docs
 
@@ -215,13 +220,13 @@ python train.py
 | Base model | Llama 3.1 8B Instruct |
 | Method | QLoRA (4-bit NF4) |
 | LoRA rank / alpha | 16 / 16 |
-| Training samples | 285 (256 train / 29 validation) |
+| Training samples | 1044 (940 train / 104 validation) |
 | Epochs | 10 |
 | Effective batch size | 8 (batch 2 × grad accum 4) |
 | Learning rate | 2e-4 |
 | Max sequence length | 2048 tokens |
 | Peak VRAM | ~9 GB |
-| Training time | ~8 min on 16 GB GPU |
+| Training time | ~30 min on 16 GB GPU |
 | Expected final loss | 0.35–0.45 |
 
 ### All CLI options
@@ -291,6 +296,12 @@ python inference.py
 
 # Single question
 python inference.py --question "How do I create a cluster with ocne?"
+
+# Force CPU (if GPU runs out of memory)
+python inference.py --cpu
+
+# Limit response length
+python inference.py --max-tokens 256
 ```
 
 The script auto-detects CUDA → MPS → CPU. On CUDA the model is loaded in 4-bit quantization (~5 GB VRAM), which fits comfortably on a 16 GB GPU.
@@ -348,7 +359,13 @@ deactivate
 
 ```bash
 cd ../ocne-model-training
+
+# Auto-detect: uses GGUF if present, otherwise falls back to safetensors (~32 GB RAM)
 bash convert_to_ollama.sh
+
+# Force safetensors conversion (skips GGUF detection)
+bash convert_to_ollama.sh --16bit
+
 ollama run oracle-cne
 ```
 
@@ -367,18 +384,22 @@ This removes the merged 16-bit model, GGUF files, training checkpoints, and the 
 ### CUDA out of memory during training
 
 **Check Ollama is stopped.** Ollama keeps models loaded in VRAM — stop it before training:
+
 ```bash
 sudo systemctl stop ollama
 ```
+
 Verify with `nvidia-smi` that only desktop processes (Xorg, gnome-shell) are using the GPU.
 
 **Check transformers version.** transformers 5.x introduced a new model loading path that loads weights in full precision before quantizing, consuming ~15 GB instead of ~5 GB and causing OOM on 16 GB GPUs. Requirements pin `transformers<5.0` to prevent this. If you see OOM at ~98% of weight loading:
+
 ```bash
 pip show transformers | grep Version
 # If 5.x: pip install "transformers>=4.47,<5.0"
 ```
 
 **If VRAM is clear and transformers is 4.x**, reduce sequence length:
+
 ```bash
 python train.py --max-seq-len 1024
 ```
@@ -388,15 +409,18 @@ python train.py --max-seq-len 1024
 Training defaults to `sdpa` (PyTorch built-in), which also uses Flash Attention kernels automatically. Only use `--flash-attn` if you have the `flash-attn` package installed.
 
 `flash-attn` requires the system CUDA toolkit version to match what PyTorch was built against. Check with:
+
 ```bash
 python -c "import torch; print(torch.version.cuda)"  # PyTorch CUDA version
 nvcc --version                                        # system toolkit version
 ```
+
 If they differ, use the default `sdpa`.
 
 ### Model not found during training
 
 The base model downloads automatically from Hugging Face on first run (~16 GB). Make sure you have accepted the Llama 3.1 license and your `.env` token is correct:
+
 ```bash
 huggingface-cli whoami
 ```
@@ -410,6 +434,7 @@ huggingface-cli whoami
 ### Slow training despite GPU
 
 Confirm the GPU is being used:
+
 ```bash
 python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
@@ -437,4 +462,4 @@ python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_
 
 MIT License. See [LICENSE](LICENSE) for details.
 
-Note: Usage of the fine-tuned model is subject to the [Llama 3.1 license](https://llama.meta.com/llama3_1/license/) and Oracle documentation usage policies.
+> Usage of the fine-tuned model is subject to the [Llama 3.1 license](https://llama.meta.com/llama3_1/license/) and Oracle documentation usage policies.
